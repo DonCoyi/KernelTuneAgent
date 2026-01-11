@@ -49,7 +49,7 @@ class KernelTuneAgent:
             "持续调优，直到训练时长满足提升要求8%\n" """
         )
     # TODO：改为不需要用户的输入，把任务要求放在用户输入里面？自动进行调优
-    async def run(self, user_input: str) -> str:
+    async def run(self) -> str:
         """执行用户请求"""
         user_input=(
             "第一轮在参数的默认取值下，跑一次模型，读取日志文件，获取baseline训练时长.\n"
