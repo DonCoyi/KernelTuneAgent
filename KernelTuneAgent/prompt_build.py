@@ -92,7 +92,9 @@ class SysctlPromptBuilder:
             line = (
                 f"{name}: range {meta['range']}, "
                 f"default {meta['default']}, "
-                f"step {meta['step']}."
+                f"step {meta['step']}, "
+                f"impact {meta['impact']}, " 
+                f"coupling {meta['coupling']}." 
             )
             lines.append(line)
         return "\n".join(lines)
@@ -100,6 +102,7 @@ class SysctlPromptBuilder:
         """返回当前启用的 sysctl 参数描述信息（多行字符串）"""
         return self.param_info
 
+# TODO:改成动态加载
     def build_initial_prompt_messages(self) -> list[dict[str, str]]:
         """构建第一轮推荐 sysctl 配置的 prompt（用于获取 baseline）"""
         content = (
@@ -125,15 +128,4 @@ class SysctlPromptBuilder:
         """返回当前启用的参数名列表"""
         return list(self.SysctlConfig.model_fields.keys())
 
-"""# JSON Schema
-json_schema = SysctlConfig.model_json_schema()
-
-model = "output/qwen3_lora"   
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="none")
-
-phase = Phase.EXPLORATION
-round_id = 1
-baseline = None
-last_value = None
-threshold=0.08"""
 
