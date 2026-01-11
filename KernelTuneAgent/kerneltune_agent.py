@@ -26,7 +26,7 @@ class KernelTuneAgent:
         self.state = AgentState.IDLE
         self.max_steps = max_steps
         self.current_step = 0
-        
+        builder = SysctlPromptBuilder()
         # 默认系统提示词
         # TODO:环境配置改为从配置文件读取
         self.system_prompt =(
@@ -42,7 +42,7 @@ class KernelTuneAgent:
             "操作系统: Ubuntu 22.04\n"
             "深度学习模型: ResNet50\n\n"
             "【参数详情】\n"
-            + SysctlPromptBuilder.param_info + "\n\n"
+            + builder.get_param_info() + "\n\n"
             """ "【任务要求】\n"
             "第一轮在参数的默认取值下，跑一次模型，读取日志文件，获取baseline训练时长.\n"
             "之后根据调优阶段规则进行参数推荐，每个字段以 'key: value' 格式返回，同样通过命令行修改参数取值为推荐值，跑一次模型，读取日志文件，获取该轮的训练时长。\n"

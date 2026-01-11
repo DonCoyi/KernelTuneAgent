@@ -96,6 +96,9 @@ class SysctlPromptBuilder:
             )
             lines.append(line)
         return "\n".join(lines)
+    def get_param_info(self) -> str:
+        """返回当前启用的 sysctl 参数描述信息（多行字符串）"""
+        return self.param_info
 
     def build_initial_prompt_messages(self) -> list[dict[str, str]]:
         """构建第一轮推荐 sysctl 配置的 prompt（用于获取 baseline）"""
