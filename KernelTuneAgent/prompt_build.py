@@ -2,7 +2,7 @@
 from pydantic import BaseModel, create_model
 from typing import Dict, Any
 from enum import Enum
-from kerneltune_agent.config import FIXED_SYSCTL_PARAMS,Phase,DYNAMIC_SYSCTL_PARAMS,SYSCTL_PARAM_META
+from KernelTuneAgent.config import FIXED_SYSCTL_PARAMS,Phase,DYNAMIC_SYSCTL_PARAMS,SYSCTL_PARAM_META
 
 def update_phase(current_phase: Phase, improvement_ratio: float) -> Phase:
     """
