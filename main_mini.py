@@ -35,20 +35,17 @@ async def main():
     print("- 在正式开始之前首先完成配置文件的更改，使其适配自己的环境")
     input("👉 按 Enter 键继续...")
 
-    # 交互循环
-    while True:
-        try:
+    try:
             
-            # 执行任务
-            # 连续执行，不需要用户输入
-            result = await agent.run()
-            print(f"\n📋 执行结果:\n{result}")
+        # 执行任务
+        # 连续执行，不需要用户输入
+        result = await agent.run()
+        print(f"\n📋 执行结果:\n{result}")
             
-        except KeyboardInterrupt:
-            print("\n👋 程序被中断，再见!")
-            break
-        except Exception as e:
-            print(f"❌ 发生错误: {e}")
+    except KeyboardInterrupt:
+        print("\n👋 程序被中断，再见!")
+    except Exception as e:
+        print(f"❌ 发生错误: {e}")
 
 
 if __name__ == "__main__":
