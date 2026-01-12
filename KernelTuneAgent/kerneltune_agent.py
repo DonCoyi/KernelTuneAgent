@@ -206,7 +206,7 @@ class KernelTuneAgent:
         if current_phase == Phase.EXPLOITATION and improvement_ratio >= 0.12:
             return Phase.REFINEMENT
         return current_phase
-    
+    # TODO:从中获取调优效果最好的一次，作为结果返回
     def _generate_summary(self) -> str:
         """生成任务执行摘要"""
         messages = self.memory.messages
