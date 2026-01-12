@@ -146,7 +146,7 @@ class BashExecutor(BaseTool):
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=600
             )
             
             if result.returncode == 0:
