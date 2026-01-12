@@ -26,10 +26,10 @@ class KernelTuneAgent:
         self.state = AgentState.IDLE
         self.max_steps = max_steps
         self.current_step = 0
-        prompt_builder = PromptBuilder()
-        tuning_phase=Phase.EXPLORATION
+        self.prompt_builder = PromptBuilder()
+        self.tuning_phase=Phase.EXPLORATION
         # 默认系统提示词
-        self.system_prompt = prompt_builder.build_system_prompt_messages()
+        self.system_prompt = self.prompt_builder.build_system_prompt_messages()
 
     async def run(self) -> str:
         """执行用户请求"""
@@ -226,4 +226,5 @@ class KernelTuneAgent:
 - 最终状态: {self.state.value}
 - 主要响应: {assistant_responses[-1] if assistant_responses else '无响应'}
 """
+
         return summary
