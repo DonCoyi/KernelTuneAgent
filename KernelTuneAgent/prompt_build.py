@@ -87,8 +87,18 @@ class PromptBuilder:
                 【常用命令】
                     运行训练命令: python /root/dongjing/model/resnet50.py
                     获取日志信息命令: grep "平均训练耗时:" /root/dongjing/result.log && rm -f /root/dongjing/result.log
-                    修改参数命令:    sysctl -w [param_name]=xxx # 除了transparent_hugepage的参数
-                                    echo always > /sys/kernel/mm/transparent_hugepage/enabled # 0:always,1:madvise;2:never
+                    修改参数命令:    sysctl -w fs.file-max=XXX
+                                    sysctl -w kernl.threads-max=XXX
+                                    sysctl -w vm.watermark_scale_factor=XXX
+                                    sysctl -w vm.dirty_background_ratio=XXX
+                                    sysctl -w vmm.dirty_expire_centisecs=XXX
+                                    sysctl -w vm.dirty_ratio=XXX
+                                    sysctl -w vm.dirty_writeback_centisecs=XXX
+                                    sysctl -w vm.overcommit_memory=XXX
+                                    sysctl -w vm.overcommit_ratio=XXX
+                                    sysctl -w vm.page-cluster=XXX
+                                    sysctl -w vm.swappiness=XXX
+                                    echo always > /sys/kernel/mm/transparent_hugepage/enabled 
                     
                 【可调参数详情】
                     {self.get_param_info()}

@@ -59,8 +59,8 @@ SYSCTL_PARAM_META = {
         "coupling": "low",
     },
     "transparent_hugepage": {
-        "range": "0-2",
-        "default": "1",
+        "range": "[always,madvise,never]",
+        "default": "madvise",
         "step": "1",
         "switch": None,
         "impact": ImpactLevel.HIGH,
