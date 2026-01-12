@@ -21,13 +21,17 @@ DYNAMIC_SYSCTL_PARAMS = {
         "switch": "numa"
     },
 }
+class ImpactLevel(str, Enum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
 SYSCTL_PARAM_META = {
     "fs.file-max": {
         "range": "1000000-30000000",
         "default": "1048576",
         "step": "1000000",
         "switch": None,
-        "impact": "high",
+        "impact": ImpactLevel.HIGH,
         "coupling": "low",
     },
     "kernel.threads-max": {
@@ -35,7 +39,7 @@ SYSCTL_PARAM_META = {
         "default": "3092111",
         "step": "655360",
         "switch": None,
-        "impact": "high",
+        "impact": ImpactLevel.HIGH,
         "coupling": "low",
     },
     "vm.watermark_scale_factor": {
@@ -43,7 +47,7 @@ SYSCTL_PARAM_META = {
         "default": "10",
         "step": "10",
         "switch": None,
-        "impact": "high",
+        "impact": ImpactLevel.HIGH,
         "coupling": "low",
     },
      "vm.page-cluster": {
@@ -51,7 +55,7 @@ SYSCTL_PARAM_META = {
         "default": "3",
         "step": "1",
         "switch": None,
-        "impact": "high",
+        "impact": ImpactLevel.HIGH,
         "coupling": "low",
     },
     "transparent_hugepage": {
@@ -59,7 +63,7 @@ SYSCTL_PARAM_META = {
         "default": "1",
         "step": "1",
         "switch": None,
-        "impact": "high",
+        "impact": ImpactLevel.HIGH,
         "coupling": "low",
     },
     "vm.dirty_background_ratio": {
@@ -67,7 +71,7 @@ SYSCTL_PARAM_META = {
         "default": "10",
         "step": "2",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.dirty_expire_centisecs": {
@@ -75,7 +79,7 @@ SYSCTL_PARAM_META = {
         "default": "3000",
         "step": "200",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.dirty_ratio": {
@@ -83,7 +87,7 @@ SYSCTL_PARAM_META = {
         "default": "30",
         "step": "2",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.dirty_writeback_centisecs": {
@@ -91,7 +95,7 @@ SYSCTL_PARAM_META = {
         "default": "500",
         "step": "100",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.overcommit_memory": {
@@ -99,7 +103,7 @@ SYSCTL_PARAM_META = {
         "default": "0",
         "step": "1",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.overcommit_ratio": {
@@ -107,7 +111,7 @@ SYSCTL_PARAM_META = {
         "default": "50",
         "step": "10",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     "vm.swappiness": {
@@ -115,7 +119,7 @@ SYSCTL_PARAM_META = {
         "default": "10",
         "step": "2",
         "switch": None,
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
     # —— 动态参数 —— #
@@ -124,22 +128,32 @@ SYSCTL_PARAM_META = {
         "default": "1",
         "step": "1",
         "switch": "numa",
-        "impact": "medium",
+        "impact": ImpactLevel.MEDIUM,
         "coupling": "medium",
     },
 }
+
 """调优阶段"""
 class Phase(Enum):
-    EXPLORATION = ("exploration", 0.20, 6, False, "大范围探索")
-    EXPLOITATION = ("exploitation", 0.05, 3, False, "围绕有效方向收敛")
-    REFINEMENT = ("refinement", 0.01, 1, False, "小范围精调")
+    EXPLORATION = ("exploration", 0.20, 5, False, "大范围探索", ImpactLevel.HIGH)
+    EXPLOITATION = ("exploitation", 0.08, 3, False, "围绕有效方向收敛", ImpactLevel.MEDIUM)
+    REFINEMENT = ("refinement", 0.02, 1, False, "小范围精调", ImpactLevel.LOW)
 
-    def __init__(self, value_str, min_change_ratio, min_changed_params, allow_float, desc):
-        self._value_ = value_str  # 保持 str 值用于序列化等
+    def __init__(
+        self,
+        value_str: str,
+        min_change_ratio: float,
+        min_changed_params: int,
+        allow_float: bool,
+        desc: str,
+        impact: str
+    ):
+        self._value_ = value_str
         self.min_change_ratio = min_change_ratio
         self.min_changed_params = min_changed_params
         self.allow_float = allow_float
         self.desc = desc
+        self.impact = impact  # 👈 新增属性
 
     @classmethod
     def from_string(cls, s: str):
@@ -153,4 +167,4 @@ class Phase(Enum):
         return self.value
 
     def __repr__(self):
-        return f"<Phase.{self.name}: '{self.value}'>"
+        return f"<Phase.{self.name}: '{self.value}', impact={self.impact}>"
