@@ -58,6 +58,8 @@ class KernelTuneAgent:
         # 获取baseline
         baseline=self._extract_training_time_from_last_tool_result()
 
+        # 添加新的用户请求
+        self.memory.add_message(Message.user_message(self.prompt_builder.build_feedback_prompt(self.tuning_phase,baseline)))
         # 执行循环
         while self.state == AgentState.RUNNING and self.current_step < self.max_steps:
             self.current_step += 1
