@@ -106,7 +106,7 @@ class PromptBuilder:
             """
         )
         return content
-    def build_feedback_prompt(phase: Phase, baseline: float, last_value=None) -> str:
+    def build_feedback_prompt(phase: Phase, baseline: float, last_value: float) -> str:
         """性能反馈的 prompt 构建"""
         perf_desc = ""
         failure_rule = ""
@@ -142,5 +142,6 @@ class PromptBuilder:
     #def get_active_param_names(self) -> list[str]:
     #    """返回当前启用的参数名列表"""
     #    return list(self.SysctlConfig.model_fields.keys())
+
 
 
