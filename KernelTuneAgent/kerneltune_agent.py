@@ -3,12 +3,12 @@
 """
 import json
 from typing import Optional
-
+import re
 from KernelTuneAgent.schema import Message, AgentState, Memory, Role
 from KernelTuneAgent.llm import SimpleLLM
 from KernelTuneAgent.tools import ToolCollection
-from KernelTuneAgent.prompt_build import SysctlPromptBuilder
-
+from KernelTuneAgent.prompt_build import PromptBuilder
+from KernelTuneAgent.config import Phase
 class KernelTuneAgent:
     """内核参数调优智能代理实现"""
     
@@ -26,34 +26,16 @@ class KernelTuneAgent:
         self.state = AgentState.IDLE
         self.max_steps = max_steps
         self.current_step = 0
-        builder = SysctlPromptBuilder()
+        prompt_builder = PromptBuilder()
+        tuning_phase=Phase.EXPLORATION
         # 默认系统提示词
-        # TODO:环境配置改为从配置文件读取
-        self.system_prompt =(
-            "根据实验环境推荐 sysctl 配置,可以使用各种工具来完成任务。\n\n"
-            "【可用工具】\n"
-            "python_execute: 执行Python代码"
-            "file_editor: 读写文件和查看目录"
-            "bash_execute: 执行命令行命令"
-            "【实验环境】\n"
-            "CPU: 48 cores\n"
-            "内存: 366GB\n"
-            "磁盘: 250GB SSD\n"
-            "操作系统: Ubuntu 22.04\n"
-            "深度学习模型: ResNet50\n\n"
-            "【文件路径】\n"
-            "模型路径 /root/dongjing/model/resnet50.py"
-            "日志路径 /root/dongjing/result.log"
-            "【可调参数详情】\n"
-            + builder.get_param_info() + "\n\n"
-        )
+        self.system_prompt = prompt_builder.build_system_prompt_messages()
+
     async def run(self) -> str:
         """执行用户请求"""
         user_input=(
-            "第一轮在参数的默认取值下，跑一次模型，读取日志文件，获取baseline训练时长.\n"
-            # 注释掉后面多余的请求看看
-            """ "之后根据调优阶段规则进行参数推荐，每个字段以 'key: value' 格式返回，同样通过命令行修改参数取值为推荐值，跑一次模型，读取日志文件，获取该轮的训练时长。\n"
-            "持续调优，直到训练时长满足提升要求8%\n" """
+            "【用户请求】"
+            "在参数的默认取值下，跑一次模型，读取日志文件.\n"
         )
         print(f"\n🚀 {self.name} 开始执行任务: {user_input}")
         
@@ -64,6 +46,18 @@ class KernelTuneAgent:
         # 添加用户消息到记忆
         self.memory.add_message(Message.user_message(user_input))
         
+        self.current_step += 1
+        print(f"\n--- 第 {self.current_step} 步 ---")
+            
+        # Think: 思考下一步行动
+        await self.think()
+  
+        # Act: 执行行动
+        await self.act()
+
+        # 获取baseline
+        baseline=self._extract_training_time_from_last_tool_result()
+
         # 执行循环
         while self.state == AgentState.RUNNING and self.current_step < self.max_steps:
             self.current_step += 1
@@ -76,7 +70,25 @@ class KernelTuneAgent:
             
             # Act: 执行行动
             await self.act()
-        
+            
+            # 从工具执行结果里获取上一轮训练时长
+            last_traing_time=self._extract_training_time_from_last_tool_result()
+            # 更新调优阶段
+            improvement_ratio = (baseline - last_traing_time) / baseline
+            # TODO:改成用 prompt_builder 中的配置控制 判断是否结束
+            if improvement_ratio >= self.prompt_builder.target:
+                print("达到性能目标，搜索结束。")
+                break
+
+            # 阶段更新
+            new_phase = self.update_phase(self.tuning_phase, improvement_ratio)
+            if new_phase != self.tuning_phase:
+                print(f"阶段切换：{self.tuning_phase.value} → {new_phase.value}")
+            self.tuning_phase = new_phase
+
+            # 添加feedback和新的调优规则
+            self.memory.add_message(Message.user_message(self.prompt_builder.build_feedback_prompt(self.tuning_phase,baseline,last_traing_time)))
+
         self.state = AgentState.FINISHED
         result = self._generate_summary()
         print(f"\n✅ 任务完成! 总共执行了 {self.current_step} 步")
@@ -165,6 +177,35 @@ class KernelTuneAgent:
                         tool_call_id=tool_id
                     )
                 )
+    def _extract_training_time_from_last_tool_result(self) -> Optional[float]:
+        """
+            从 memory 中最后一条 tool 消息的内容中提取 '平均训练耗时: XXX 秒' 的浮点数值。
+    
+            返回:
+            float: 提取到的训练时间（秒），如果未找到则返回 None
+        """
+        # 从后往前找第一条 role == Role.TOOL 的消息
+        for msg in reversed(self.memory.messages):
+            if msg.role == Role.TOOL and msg.content:
+                # 使用正则匹配 "平均训练耗时: 123.45 秒"
+                match = re.search(r"平均训练耗时:\s*([\d.]+)\s*秒", msg.content)
+                if match:
+                    try:
+                        return float(match.group(1))
+                    except ValueError:
+                        continue  # 格式异常，跳过
+        return None
+    def update_phase(current_phase: Phase, improvement_ratio: float) -> Phase:
+        """
+        根据当前阶段和性能提升比例决定是否进入下一阶段。
+        注意：current_phase 是 Phase 枚举实例，不是字符串！
+        """
+
+        if current_phase == Phase.EXPLORATION and improvement_ratio >= 0.05:
+            return Phase.EXPLOITATION
+        if current_phase == Phase.EXPLOITATION and improvement_ratio >= 0.12:
+            return Phase.REFINEMENT
+        return current_phase
     
     def _generate_summary(self) -> str:
         """生成任务执行摘要"""
