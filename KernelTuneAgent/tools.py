@@ -146,7 +146,7 @@ class BashExecutor(BaseTool):
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=600
+                timeout=3600
             )
             
             if result.returncode == 0:
@@ -184,4 +184,5 @@ class ToolCollection:
             return ToolResult(success=False, error=f"工具 {name} 不存在")
         
         tool = self.tools[name]
+
         return await tool.execute(**kwargs)
