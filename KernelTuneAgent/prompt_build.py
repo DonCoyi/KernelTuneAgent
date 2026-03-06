@@ -11,6 +11,7 @@ class PromptBuilder:
         #self.SysctlConfig = self._build_sysctl_config()
         self.param_info = self._build_param_info()
         self.target= 0.08
+        self.train_cmd=""
     # TODO:读取所有实验环境、路径信息
     def _load_sys_config(self) -> Dict[str, bool]:
         """从配置文件加载参数开关"""
@@ -22,7 +23,16 @@ class PromptBuilder:
                     if not line or line.startswith("#"):
                         continue
                     key, value = line.split(":", 1)
+                    key = key.strip().lower()
+                    value = value.strip()
+
+                    # 读取训练命令
+                    if key in ["train command", "train_command"]:
+                        self.train_cmd = value
+                        continue
+
                     cfg[key.strip()] = value.strip().lower() == "true"
+
         except FileNotFoundError:
             print(f"Warning: {self.config_path} not found. Using empty config.")
         return cfg
@@ -66,7 +76,11 @@ class PromptBuilder:
         return self.param_info
 
     # TODO:改成动态加载
+    # 运行训练命令: python /root/dongjing/model/resnet50.py
+    # ./lora.sh
     def build_system_prompt_messages(self) -> str:
+        train_cmd = self.train_cmd if self.train_cmd else "未配置训练命令"
+
         """构建第一轮推荐 sysctl 配置的 prompt（用于获取 baseline）"""
         content = (
             f"""
@@ -85,7 +99,7 @@ class PromptBuilder:
                     深度学习模型: ResNet50
 
                 【常用命令】
-                    运行训练命令: python /root/dongjing/model/resnet50.py
+                    运行训练命令: {train_cmd}
                     获取日志信息命令: grep "平均训练耗时:" /root/dongjing/result.log && rm -f /root/dongjing/result.log
                     修改参数命令:    sysctl -w fs.file-max=XXX
                                     sysctl -w kernl.threads-max=XXX
