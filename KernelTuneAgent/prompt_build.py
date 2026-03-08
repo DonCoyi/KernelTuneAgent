@@ -7,11 +7,11 @@ from KernelTuneAgent.config import FIXED_SYSCTL_PARAMS,Phase,DYNAMIC_SYSCTL_PARA
 class PromptBuilder:
     def __init__(self, config_path: str = "./sys.config"):
         self.config_path = config_path
+        self.train_cmd=""
         self.sys_cfg = self._load_sys_config()
         #self.SysctlConfig = self._build_sysctl_config()
         self.param_info = self._build_param_info()
         self.target= 0.08
-        self.train_cmd=""
     # TODO:读取所有实验环境、路径信息
     def _load_sys_config(self) -> Dict[str, bool]:
         """从配置文件加载参数开关"""
@@ -102,10 +102,10 @@ class PromptBuilder:
                     运行训练命令: {train_cmd}
                     获取日志信息命令: grep "平均训练耗时:" /root/dongjing/result.log && rm -f /root/dongjing/result.log
                     修改参数命令:    sysctl -w fs.file-max=XXX
-                                    sysctl -w kernl.threads-max=XXX
+                                    sysctl -w kernel.threads-max=XXX
                                     sysctl -w vm.watermark_scale_factor=XXX
                                     sysctl -w vm.dirty_background_ratio=XXX
-                                    sysctl -w vmm.dirty_expire_centisecs=XXX
+                                    sysctl -w vm.dirty_expire_centisecs=XXX
                                     sysctl -w vm.dirty_ratio=XXX
                                     sysctl -w vm.dirty_writeback_centisecs=XXX
                                     sysctl -w vm.overcommit_memory=XXX
@@ -156,6 +156,7 @@ class PromptBuilder:
     #def get_active_param_names(self) -> list[str]:
     #    """返回当前启用的参数名列表"""
     #    return list(self.SysctlConfig.model_fields.keys())
+
 
 
 
