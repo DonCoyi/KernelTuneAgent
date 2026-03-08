@@ -156,10 +156,13 @@ class KernelTuneAgent:
                 
                 # 准备结果消息
                 if result.success:
-                    result_content = result.output
-                    print(f"✅ 工具执行成功: {result_content[:100]}...")
+                    raw_content  = result.output
+                    result_content = self._truncate_tool_output(raw_content, max_length=600)
+                    print(f"✅ 工具执行成功: {result_content[:100]}... (原始长度: {len(raw_content)}, 处理后长度: {len(result_content)})")
                 else:
                     result_content = f"错误: {result.error}"
+                    if len(result_content) > 1000:
+                        result_content = result_content[:1000] + "... [错误信息过长已截断]"
                     print(f"❌ 工具执行失败: {result.error}")
                 
                 # 保存工具结果
@@ -179,6 +182,40 @@ class KernelTuneAgent:
                         tool_call_id=tool_id
                     )
                 )
+    def _truncate_tool_output(self, text: str, max_length: int = 600, keep_head_ratio: float = 0.4) -> str:
+        """
+        截断过长的工具输出，保留头部和尾部，中间用省略号代替。
+        
+        Args:
+            text: 原始文本
+            max_length: 允许的最大字符数
+            keep_head_ratio: 头部保留的比例 (0.4 表示保留前 40%)
+            
+        Returns:
+            截断后的文本
+        """
+        if len(text) <= max_length:
+            return text
+        
+        # 计算头部和尾部的长度
+        head_len = int(max_length * keep_head_ratio)
+        tail_len = max_length - head_len - 50 # 50 留给省略号和提示语
+        
+        if tail_len < 100: # 如果尾部太短，调整比例
+            head_len = int(max_length * 0.6)
+            tail_len = max_length - head_len - 50
+
+        head = text[:head_len]
+        tail = text[-tail_len:]
+        
+        # 尝试按行截断，避免切断 JSON 或日志的一半（可选优化）
+        # 这里简单按字符截断，如果需要更智能可以按 '\n' 分割
+        
+        separator = f"\n\n... [日志中间部分已省略，原始长度 {len(text)} 字符，为节省 Token 已截断] ...\n\n"
+        
+        return head + separator + tail
+
+
     def _extract_training_time_from_last_tool_result(self) -> Optional[float]:
         """
             从 memory 中最后一条 tool 消息的内容中提取 '平均训练耗时: XXX 秒' 的浮点数值。
