@@ -234,7 +234,7 @@ class KernelTuneAgent:
                     except ValueError:
                         continue  # 格式异常，跳过
         return None
-    def update_phase(current_phase: Phase, improvement_ratio: float) -> Phase:
+    def update_phase(self,current_phase: Phase, improvement_ratio: float) -> Phase:
         """
         根据当前阶段和性能提升比例决定是否进入下一阶段。
         注意：current_phase 是 Phase 枚举实例，不是字符串！
@@ -265,4 +265,5 @@ class KernelTuneAgent:
 """
 
         return summary
+
 
