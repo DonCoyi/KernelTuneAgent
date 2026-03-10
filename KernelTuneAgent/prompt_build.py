@@ -84,7 +84,7 @@ class PromptBuilder:
         """构建第一轮推荐 sysctl 配置的 prompt（用于获取 baseline）"""
         content = (
             f"""
-                根据实验环境推荐 sysctl 配置,每一轮需要返回工具调用帮助完成任务，持续这一过程，不主动结束。
+                根据实验环境推荐 sysctl 配置,运行训练命令,获取日志信息,得到默认系统配置下的训练时长。之后进行配置推荐，并修改参数,运行训练命令，获取新的配置下日志信息。重复这一过程。
 
                 【可用工具】
                     python_execute: 执行Python代码
@@ -156,6 +156,7 @@ class PromptBuilder:
     #def get_active_param_names(self) -> list[str]:
     #    """返回当前启用的参数名列表"""
     #    return list(self.SysctlConfig.model_fields.keys())
+
 
 
 
