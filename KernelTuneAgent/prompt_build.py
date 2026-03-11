@@ -30,7 +30,15 @@ class PromptBuilder:
                     if key in ["train command", "train_command"]:
                         self.train_cmd = value
                         continue
-
+                    # 🎯 读取 target 目标值
+                    if key in ["target", "target_ratio", "improvement_target"]:
+                        try:
+                            self.target = float(value)
+                            print(f"✅ 加载 target 配置：{self.target}")
+                        except ValueError:
+                            print(f"⚠️ 警告：target 值 '{value}' 无效，使用默认值 {self.target}")
+                        continue
+                        
                     cfg[key.strip()] = value.strip().lower() == "true"
 
         except FileNotFoundError:
@@ -156,6 +164,7 @@ class PromptBuilder:
     #def get_active_param_names(self) -> list[str]:
     #    """返回当前启用的参数名列表"""
     #    return list(self.SysctlConfig.model_fields.keys())
+
 
 
 
