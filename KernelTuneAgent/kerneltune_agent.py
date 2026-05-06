@@ -247,23 +247,36 @@ class KernelTuneAgent:
         return current_phase
     # TODO:从中获取调优效果最好的一次，作为结果返回
     def _generate_summary(self) -> str:
-        """生成任务执行摘要，汇总每轮的 sysctl 和 echo 命令"""
+        """
+        生成任务执行摘要。
+        解析每轮的 sysctl 和 echo 命令，提取参数及其最终取值。
+        """
         messages = self.memory.messages
         if not messages:
             return "没有执行任何操作"
-    
-        # 用于存储每轮的命令汇总
-        round_commands = []
-        current_round = {"sysctl": [], "echo": []}
-    
-        # 遍历所有消息，按轮次提取 sysctl 和 echo 命令
+
+        # 定义固定参数集合
+        ALL_PARAMS = {
+            "fs.file-max",
+            "kernel.threads-max",
+            "vm.watermark_scale_factor",
+            "vm.dirty_background_ratio",
+            "vm.dirty_expire_centisecs",
+            "vm.dirty_ratio",
+            "vm.dirty_writeback_centisecs",
+            "vm.overcommit_memory",
+            "vm.overcommit_ratio",
+            "vm.page-cluster",
+            "vm.swappiness",
+            "transparent_hugepage",
+            "kernel.numa_balancing",
+        }
+
+        # 用于存储参数的最终取值
+        final_param_values = {}
+
+        # 遍历所有消息，提取并更新参数值
         for msg in messages:
-            # 当遇到用户消息时，标志着一个新轮次的开始（第一轮除外）
-            if msg.role == Role.USER and (current_round["sysctl"] or current_round["echo"]):
-                round_commands.append(current_round)
-                current_round = {"sysctl": [], "echo": []}
-        
-            # 从助手消息中提取工具调用
             if msg.role == Role.ASSISTANT and msg.tool_calls:
                 for tool_call in msg.tool_calls:
                     # 确保工具调用格式正确
@@ -272,42 +285,44 @@ class KernelTuneAgent:
                             # 解析工具调用的参数
                             arguments = json.loads(tool_call['function']['arguments'])
                             command = arguments.get('command', '')
-                        
-                            # 判断命令类型并归类
+
+                            # 处理 sysctl 命令
+                            # 匹配 sysctl -w key=value
                             if command.startswith('sysctl'):
-                                current_round["sysctl"].append(command)
+                                import re
+                                # 使用正则表达式查找所有 key=value 对
+                                matches = re.findall(r'([\w\.\-]+)=([\d\w\.\-]+)', command)
+                                for key, value in matches:
+                                    if key in ALL_PARAMS:
+                                        final_param_values[key] = value
+
+                            # 处理 echo 命令
+                            # 匹配 echo value > /path/to/file
+                            # 特别处理 transparent_hugepage 的情况
                             elif command.startswith('echo'):
-                                current_round["echo"].append(command)
+                                if 'transparent_hugepage' in command:
+                                    import re
+                                    # 提取 echo 后面的值 (例如 'always', 'never', 'madvise')
+                                    match = re.search(r'echo\s+(\w+)\s+>', command)
+                                    if match:
+                                        value = match.group(1)
+                                        # 将 transparent_hugepage 的值存入字典
+                                        final_param_values['transparent_hugepage'] = value
+
                         except (json.JSONDecodeError, KeyError):
                             # 忽略格式错误的工具调用
                             continue
-    
-        # 不要忘记添加最后一轮的命令
-        if current_round["sysctl"] or current_round["echo"]:
-            round_commands.append(current_round)
 
         # 构建摘要信息
         summary = "📝 任务执行摘要\n"
-        summary += "-" * 30 + "\n"
-    
-        # 输出每轮的命令汇总
-        if round_commands:
-            for i, round_cmd in enumerate(round_commands, 1):
-                summary += f"\n--- 第 {i} 轮 ---\n"
-                if round_cmd["sysctl"]:
-                    summary += "【sysctl 命令】:\n"
-                    for cmd in round_cmd["sysctl"]:
-                        summary += f"  - {cmd}\n"
-                if round_cmd["echo"]:
-                    summary += "【echo 命令】:\n"
-                    for cmd in round_cmd["echo"]:
-                        summary += f"  - {cmd}\n"
-        else:
-            summary += "未找到相关的 sysctl 或 echo 命令。\n"
+        summary += "-" * 40 + "\n"
+        summary += "最终参数取值:\n"
         
-        summary += "-" * 30 + "\n"
-        summary += f"总轮次: {len(round_commands)}"
+        # 按字母顺序对参数进行排序并输出
+        for param in sorted(final_param_values.keys()):
+            summary += f"  - {param}: {final_param_values[param]}\n"
+            
+        summary += "-" * 40 + "\n"
+        summary += f"总轮次: {self.current_step}"
 
         return summary
-
-
