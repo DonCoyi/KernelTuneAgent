@@ -253,16 +253,21 @@ class KernelTuneAgent:
             return "没有执行任何操作"
         
         # 提取关键信息
-        user_requests = [msg.content for msg in messages if msg.role == Role.USER]
-        assistant_responses = [msg.content for msg in messages if msg.role == Role.ASSISTANT and msg.content]
-        
-        summary = f"""
-任务执行摘要:
-- 用户请求: {user_requests[0] if user_requests else '未知'}
-- 执行步数: {self.current_step}
-- 最终状态: {self.state.value}
-- 主要响应: {assistant_responses[-1] if assistant_responses else '无响应'}
-"""
+        # user_requests = [msg.content for msg in messages if msg.role == Role.USER]
+        # assistant_responses = [msg.content for msg in messages if msg.role == Role.ASSISTANT and msg.content]
+        tool_results=[msg.content for msg in messages if msg.role==Role.TOOL]
+
+        # 输出每个轮次的工具执行结果
+        if tool_results:
+            for i, result in enumerate(tool_results, 1):
+                summary += f"\n--- 第 {i} 轮工具执行结果 ---\n"
+                # 为了保持摘要简洁，对过长的结果进行截断
+                if len(result) > 300:
+                    summary += f"{result[:300]}... [结果过长已截断]\n"
+                else:
+                    summary += f"{result}\n"
+        else:
+            summary += "无工具执行结果\n"
 
         return summary
 
