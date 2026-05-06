@@ -31,6 +31,11 @@ class KernelTuneAgent:
         # 默认系统提示词
         self.system_prompt = self.prompt_builder.build_system_prompt_messages()
 
+        # --- 新增：用于追踪最佳效果的变量 ---
+        self.best_improvement_ratio = -1.0  # 记录历史最高的提升率
+        self.best_step_index = 0            # 记录达到最高提升率时的步数索引（对应 memory 中的位置或轮次）
+
+
     async def run(self) -> str:
         """执行用户请求"""
         user_input=(
@@ -77,6 +82,13 @@ class KernelTuneAgent:
             last_traing_time=self._extract_training_time_from_last_tool_result()
             # 更新调优阶段
             improvement_ratio = (baseline - last_traing_time) / baseline
+
+            # --- 新增：更新最佳记录 ---
+            if improvement_ratio > self.best_improvement_ratio:
+                self.best_improvement_ratio = improvement_ratio
+                self.best_step_index = self.current_step # 记录当前步数为最佳步数
+                print(f"✨ 发现新的最佳效果！提升率: {improvement_ratio:.2%}, 步数: {self.current_step}")
+
             # TODO:改成用 prompt_builder 中的配置控制 判断是否结束
             if improvement_ratio >= self.prompt_builder.target:
                 print("达到性能目标，搜索结束。")
@@ -249,14 +261,16 @@ class KernelTuneAgent:
     def _generate_summary(self) -> str:
         """
         生成任务执行摘要。
+        逻辑：
         1. 从 SYSCTL_PARAM_META 初始化所有参数的默认值。
-        2. 解析每轮的 sysctl 和 echo 命令，提取参数及其最终取值，覆盖默认值。
+        2. 仅遍历到 best_step_index 为止的消息，解析 sysctl 和 echo 命令。
+        3. 后续轮次的修改不会生效，保证输出的是“最佳时刻”的参数状态。
         """
         messages = self.memory.messages
         if not messages:
             return "没有执行任何操作"
 
-        # 引入参数元数据，包含默认值等信息
+        # 引入参数元数据
         SYSCTL_PARAM_META = {
             "fs.file-max": {"default": "1048576"},
             "kernel.threads-max": {"default": "3092111"},
@@ -278,9 +292,24 @@ class KernelTuneAgent:
         for param, meta in SYSCTL_PARAM_META.items():
             final_param_values[param] = meta["default"]
 
-        # 2. 遍历所有消息，提取并更新参数值
+        # 2. 遍历消息，但限制在 best_step_index 之前
+        # 注意：这里的逻辑假设 message 的顺序和 step 是线性对应的
+        # 我们遍历所有消息，但通过逻辑判断是否处理
+        # 为了更精确，我们需要知道每条消息属于哪个 Step。
+        # 由于代码中没有显式的 step_id 在 message 中，我们假设消息是按顺序追加的。
+        # 简单的做法是：统计处理过的 Assistant 消息数量，直到达到 best_step_index。
+        
+        assistant_action_count = 0
+        
         for msg in messages:
+            # 只有 Assistant 的消息包含工具调用（行动）
             if msg.role == Role.ASSISTANT and msg.tool_calls:
+                assistant_action_count += 1
+                
+                # 核心修改：如果当前行动轮次超过了最佳轮次，停止解析
+                if assistant_action_count > self.best_step_index:
+                    break
+                
                 for tool_call in msg.tool_calls:
                     if 'function' in tool_call and 'arguments' in tool_call['function']:
                         try:
@@ -290,7 +319,6 @@ class KernelTuneAgent:
 
                             # 处理 sysctl 命令
                             if command.startswith('sysctl'):
-                                # 匹配 sysctl -w key=value
                                 matches = re.findall(r'([\w\.\-]+)=([\d\w\.\-]+)', command)
                                 for key, value in matches:
                                     if key in final_param_values:
@@ -299,26 +327,25 @@ class KernelTuneAgent:
                             # 处理 echo 命令
                             elif command.startswith('echo'):
                                 if 'transparent_hugepage' in command:
-                                    # 提取 echo 后面的值 (例如 'always', 'never', 'madvise')
                                     match = re.search(r'echo\s+(\w+)\s+>', command)
                                     if match:
                                         value = match.group(1)
                                         final_param_values['transparent_hugepage'] = value
 
                         except (json.JSONDecodeError, KeyError):
-                            # 忽略格式错误的工具调用
                             continue
 
         # 3. 构建摘要信息
-        summary = "📝 任务执行摘要\n"
-        summary += "-" * 40 + "\n"
-        summary += "最终参数取值:\n"
+        summary = "📝 任务执行摘要 (基于最佳轮次)\n"
+        summary += "-" * 50 + "\n"
+        summary += f"最佳效果轮次: 第 {self.best_step_index} 轮\n"
+        summary += f"最佳提升率: {self.best_improvement_ratio:.2%}\n"
+        summary += "-" * 50 + "\n"
+        summary += "最佳状态下的参数取值:\n"
         
-        # 按字母顺序对参数进行排序并输出
         for param in sorted(final_param_values.keys()):
             summary += f"  - {param}: {final_param_values[param]}\n"
             
-        summary += "-" * 40 + "\n"
-        summary += f"总轮次: {self.current_step}"
+        summary += "-" * 50
 
         return summary
