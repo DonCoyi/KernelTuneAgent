@@ -247,27 +247,66 @@ class KernelTuneAgent:
         return current_phase
     # TODO:从中获取调优效果最好的一次，作为结果返回
     def _generate_summary(self) -> str:
-        """生成任务执行摘要"""
+        """生成任务执行摘要，汇总每轮的 sysctl 和 echo 命令"""
         messages = self.memory.messages
         if not messages:
             return "没有执行任何操作"
+    
+        # 用于存储每轮的命令汇总
+        round_commands = []
+        current_round = {"sysctl": [], "echo": []}
+    
+        # 遍历所有消息，按轮次提取 sysctl 和 echo 命令
+        for msg in messages:
+            # 当遇到用户消息时，标志着一个新轮次的开始（第一轮除外）
+            if msg.role == Role.USER and (current_round["sysctl"] or current_round["echo"]):
+                round_commands.append(current_round)
+                current_round = {"sysctl": [], "echo": []}
         
-        # 提取关键信息
-        # user_requests = [msg.content for msg in messages if msg.role == Role.USER]
-        # assistant_responses = [msg.content for msg in messages if msg.role == Role.ASSISTANT and msg.content]
-        tool_results=[msg.content for msg in messages if msg.role==Role.TOOL]
+            # 从助手消息中提取工具调用
+            if msg.role == Role.ASSISTANT and msg.tool_calls:
+                for tool_call in msg.tool_calls:
+                    # 确保工具调用格式正确
+                    if 'function' in tool_call and 'arguments' in tool_call['function']:
+                        try:
+                            # 解析工具调用的参数
+                            arguments = json.loads(tool_call['function']['arguments'])
+                            command = arguments.get('command', '')
+                        
+                            # 判断命令类型并归类
+                            if command.startswith('sysctl'):
+                                current_round["sysctl"].append(command)
+                            elif command.startswith('echo'):
+                                current_round["echo"].append(command)
+                        except (json.JSONDecodeError, KeyError):
+                            # 忽略格式错误的工具调用
+                            continue
+    
+        # 不要忘记添加最后一轮的命令
+        if current_round["sysctl"] or current_round["echo"]:
+            round_commands.append(current_round)
 
-        # 输出每个轮次的工具执行结果
-        if tool_results:
-            for i, result in enumerate(tool_results, 1):
-                summary += f"\n--- 第 {i} 轮工具执行结果 ---\n"
-                # 为了保持摘要简洁，对过长的结果进行截断
-                if len(result) > 300:
-                    summary += f"{result[:300]}... [结果过长已截断]\n"
-                else:
-                    summary += f"{result}\n"
+        # 构建摘要信息
+        summary = "📝 任务执行摘要\n"
+        summary += "-" * 30 + "\n"
+    
+        # 输出每轮的命令汇总
+        if round_commands:
+            for i, round_cmd in enumerate(round_commands, 1):
+                summary += f"\n--- 第 {i} 轮 ---\n"
+                if round_cmd["sysctl"]:
+                    summary += "【sysctl 命令】:\n"
+                    for cmd in round_cmd["sysctl"]:
+                        summary += f"  - {cmd}\n"
+                if round_cmd["echo"]:
+                    summary += "【echo 命令】:\n"
+                    for cmd in round_cmd["echo"]:
+                        summary += f"  - {cmd}\n"
         else:
-            summary += "无工具执行结果\n"
+            summary += "未找到相关的 sysctl 或 echo 命令。\n"
+        
+        summary += "-" * 30 + "\n"
+        summary += f"总轮次: {len(round_commands)}"
 
         return summary
 
